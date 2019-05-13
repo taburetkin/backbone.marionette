@@ -102,6 +102,23 @@ describe('CollectionView -  Empty', function() {
     });
   });
 
+  describe('when rendering in a template', function() {
+    it('should show the emptyView inside the childViewContainer', function() {
+      const TemplatedCollectionView = MyCollectionView.extend({
+        childViewContainer: '#region',
+        template: _.template('<div id="region"></div>')
+      });
+
+      const cv = new TemplatedCollectionView({
+        collection: new Backbone.Collection()
+      });
+
+      cv.render();
+
+      expect(cv.$('#region')).to.contain.$text('Empty');
+    });
+  });
+
   describe('#getEmptyRegion', function() {
     let collection;
     let myCollectionView;
@@ -306,7 +323,7 @@ describe('CollectionView -  Empty', function() {
 
       describe('when removing one child', function() {
         beforeEach(function() {
-          myCollectionView.isEmpty.reset();
+          myCollectionView.isEmpty.resetHistory();
           myCollectionView.removeChildView(myCollectionView.children.first());
         });
 
@@ -322,7 +339,7 @@ describe('CollectionView -  Empty', function() {
       describe('when removing the only child', function() {
         beforeEach(function() {
           myCollectionView.removeChildView(myCollectionView.children.first());
-          myCollectionView.isEmpty.reset();
+          myCollectionView.isEmpty.resetHistory();
           myCollectionView.removeChildView(myCollectionView.children.first());
         });
 

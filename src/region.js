@@ -30,15 +30,7 @@ const Region = function(options) {
   // Handle when this.el is passed in as a $ wrapped element.
   this.el = this.el instanceof Backbone.$ ? this.el[0] : this.el;
 
-  if (!this.el) {
-    throw new MarionetteError({
-      name: classErrorName,
-      message: 'An "el" must be specified for a region.',
-      url: 'marionette.region.html#additional-options'
-    });
-  }
-
-  this.$el = this.getEl(this.el);
+  this.$el = this._getEl(this.el);
 
   this.initialize.apply(this, arguments);
 };
@@ -71,12 +63,20 @@ _.extend(Region.prototype, CommonMixin, {
 
     if (view === this.currentView) { return this; }
 
+    if (view._isShown) {
+      throw new MarionetteError({
+        name: classErrorName,
+        message: 'View is already shown in a Region or CollectionView',
+        url: 'marionette.region.html#showing-a-view'
+      });
+    }
+
     this._isSwappingView = !!this.currentView;
 
     this.triggerMethod('before:show', this, view, options);
 
     // Assume an attached view is already in the region for pre-existing DOM
-    if (!view._isAttached) {
+    if (this.currentView || !view._isAttached) {
       this.empty(options);
     }
 
@@ -91,6 +91,56 @@ _.extend(Region.prototype, CommonMixin, {
     this.triggerMethod('show', this, view, options);
 
     this._isSwappingView = false;
+
+    return this;
+  },
+
+  _getEl(el) {
+    if (!el) {
+      throw new MarionetteError({
+        name: classErrorName,
+        message: 'An "el" must be specified for a region.',
+        url: 'marionette.region.html#additional-options'
+      });
+    }
+
+    return this.getEl(el);
+  },
+
+  _setEl() {
+    this.$el = this._getEl(this.el);
+
+    if (this.$el.length) {
+      this.el = this.$el[0];
+    }
+
+    // Make sure the $el contains only the el
+    if (this.$el.length > 1) {
+      this.$el = this.Dom.getEl(this.el);
+    }
+  },
+
+  // Set the `el` of the region and move any current view to the new `el`.
+  _setElement(el) {
+    if (el === this.el) { return this; }
+
+    const shouldReplace = this._isReplaced;
+
+    this._restoreEl();
+
+    this.el = el;
+
+    this._setEl();
+
+    if (this.currentView) {
+      const view = this.currentView;
+
+      if (shouldReplace) {
+        this._replaceEl(view);
+      } else {
+        this.attachHtml(view);
+      }
+    }
 
     return this;
   },
@@ -119,9 +169,13 @@ _.extend(Region.prototype, CommonMixin, {
     return this._parentView && this._parentView.monitorViewEvents === false;
   },
 
-  _attachView(view, options = {}) {
-    const shouldTriggerAttach = !view._isAttached && this.Dom.hasEl(document.documentElement, this.el) && !this._shouldDisableMonitoring();
-    const shouldReplaceEl = typeof options.replaceElement === 'undefined' ? !!_.result(this, 'replaceElement') : !!options.replaceElement;
+  _isElAttached() {
+    return this.Dom.hasEl(this.Dom.getDocumentEl(this.el), this.el);
+  },
+
+  _attachView(view, { replaceElement } = {}) {
+    const shouldTriggerAttach = !view._isAttached && this._isElAttached() && !this._shouldDisableMonitoring();
+    const shouldReplaceEl = typeof replaceElement === 'undefined' ? !!_.result(this, 'replaceElement') : !!replaceElement;
 
     if (shouldTriggerAttach) {
       view.triggerMethod('before:attach', view);
@@ -137,14 +191,14 @@ _.extend(Region.prototype, CommonMixin, {
       view._isAttached = true;
       view.triggerMethod('attach', view);
     }
+
+    // Corresponds that view is shown in a marionette Region or CollectionView
+    view._isShown = true;
   },
 
   _ensureElement(options = {}) {
     if (!_.isObject(this.el)) {
-      this.$el = this.getEl(this.el);
-      this.el = this.$el[0];
-      // Make sure the $el contains only the el
-      this.$el = this.Dom.getEl(this.el);
+      this._setEl();
     }
 
     if (!this.$el || this.$el.length === 0) {
@@ -218,7 +272,7 @@ _.extend(Region.prototype, CommonMixin, {
   },
 
   _replaceEl(view) {
-    // always restore the el to ensure the regions el is present before replacing
+    // Always restore the el to ensure the regions el is present before replacing
     this._restoreEl();
 
     view.on('before:destroy', this._restoreEl, this);
@@ -293,6 +347,7 @@ _.extend(Region.prototype, CommonMixin, {
       } else {
         this._detachView(view);
       }
+      view._isShown = false;
       this._stopChildViewEvents(view);
     }
 
@@ -373,9 +428,7 @@ _.extend(Region.prototype, CommonMixin, {
   reset(options) {
     this.empty(options);
 
-    if (this.$el) {
-      this.el = this._initEl;
-    }
+    this.el = this._initEl;
 
     delete this.$el;
     return this;

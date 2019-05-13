@@ -8,6 +8,7 @@ import ChildViewContainer from '../../../src/child-view-container';
 import View from '../../../src/view';
 import Region from '../../../src/region';
 
+
 describe('CollectionView Children', function() {
   const collection = new Backbone.Collection([
     { id: 1 },
@@ -204,6 +205,93 @@ describe('CollectionView Children', function() {
       this.sinon.spy(myCollectionView, 'sort');
     });
 
+    describe('when called with preventRender option', function() {
+
+      beforeEach(function() {
+        myCollectionView.addChildView(addView, { preventRender: true });
+      });
+
+      it('should return the added view', function() {
+        expect(myCollectionView.addChildView).to.have.returned(addView);
+      });
+
+      it('should add to the children container', function() {
+        expect(myCollectionView.children._add)
+          .to.have.been.calledOnce.and.calledWith(addView);
+      });
+
+      it('should not call sort', function() {
+        expect(myCollectionView.sort)
+          .to.be.not.called;
+      });
+
+      it('should not trigger "before:render:children"', function() {
+        expect(myCollectionView.onBeforeRenderChildren)
+          .to.be.not.called;
+      });
+
+      it('should not trigger "render:children"', function() {
+        expect(myCollectionView.onRenderChildren)
+          .to.be.not.called;
+      });
+
+      it('should trigger "add:child"', function() {
+        expect(myCollectionView.onAddChild)
+          .to.be.calledOnce.and.calledWith(myCollectionView, addView);
+      });
+
+      it('should trigger "before:add:child"', function() {
+        expect(myCollectionView.onBeforeAddChild)
+          .to.be.calledOnce.and.calledWith(myCollectionView, addView);
+      });
+
+    });
+
+    describe('when called with an index in options', function() {
+      const addIndex = 1;
+      beforeEach(function() {
+        myCollectionView.addChildView(addView, 0, { preventRender: true, index: addIndex });
+      });
+
+      it('should add to the children container at the index from options', function() {
+        expect(myCollectionView.children._add)
+          .to.have.been.calledOnce.and.calledWith(addView, addIndex);
+      });
+
+    });
+
+    describe('when called without preventRender after preventReder calls', function() {
+      const addIndex = 1;
+      beforeEach(function() {
+        const addView2 = new View({ template: _.noop });
+        myCollectionView.addChildView(addView, { preventRender: true, index: addIndex });
+        myCollectionView.addChildView(addView2);
+      });
+
+      it('should not use the _addedViews perf', function() {
+        expect(myCollectionView.onRenderChildren.args[0][1]).to.have.lengthOf(myCollectionView.children.length);
+      });
+
+    });
+
+    describe('when collection changed having unrendered views', function() {
+      let onRender;
+      beforeEach(function() {
+        onRender = this.sinon.stub();
+        let addView1 = new View({ template: _.noop, onRender });
+        let addView2 = new View({ template: _.noop, onRender });
+        myCollectionView.addChildView(addView1, { preventRender: true, index: 0 });
+        myCollectionView.addChildView(addView2, { preventRender: true });
+        collection.add({id: 4});
+      });
+      afterEach(function() {
+        collection.remove(collection.last());
+      });
+      it('should render all unrendered views', function() {
+        expect(onRender).to.have.been.calledTwice;
+      });
+    });
+
     describe('when called without an index', function() {
       beforeEach(function() {
 
@@ -334,6 +422,45 @@ describe('CollectionView Children', function() {
         expect(myCollectionView.addChildView).to.have.returned(destroyedView);
       });
     });
+
+    describe('when called with showed view', function() {
+      let anotherCollectionView;
+
+      beforeEach(function() {
+        anotherCollectionView = new MyCollectionView();
+        addView = new View({ template: _.noop });
+        anotherCollectionView.addChildView(addView);
+      });
+
+      it('should throw an error', function() {
+        expect(myCollectionView.addChildView.bind(myCollectionView, addView)).to.throw();
+      });
+
+    });
+
+    describe('when adding detached view', function() {
+      let anotherCollectionView;
+      let region;
+      beforeEach(function() {
+        anotherCollectionView = new MyCollectionView();
+        this.setFixtures('<div id="region"></div>');
+        region = new Region({ el: '#region' });
+        addView = new View({ template: _.noop });
+      });
+
+      it('should not throw an error if view was detached from CollectionView',function() {
+        anotherCollectionView.addChildView(addView);
+        anotherCollectionView.detachChildView(addView);
+        expect(myCollectionView.addChildView.bind(myCollectionView, addView)).to.not.throw();
+      });
+
+      it('should not throw an error if view was detached from Region',function() {
+        region.show(addView);
+        region.detachView(addView);
+        expect(myCollectionView.addChildView.bind(myCollectionView, addView)).to.not.throw();
+      });
+
+    });
   });
 
   describe('#detachChildView', function() {
@@ -359,6 +486,7 @@ describe('CollectionView Children', function() {
       expect(myCollectionView.removeChildView)
         .to.have.been.calledOnce.and.calledWith(detachView, { shouldDetach: true });
     });
+
   });
 
   describe('#removeChildView', function() {
@@ -405,7 +533,7 @@ describe('CollectionView Children', function() {
     describe('when called without a view', function() {
       beforeEach(function() {
         myCollectionView.onRemoveChild.reset();
-        myCollectionView.removeChildView.reset();
+        myCollectionView.removeChildView.resetHistory();
         myCollectionView.removeChildView();
       });
 
@@ -420,7 +548,7 @@ describe('CollectionView Children', function() {
 
       beforeEach(function() {
         myCollectionView.onRemoveChild.reset();
-        myCollectionView.removeChildView.reset();
+        myCollectionView.removeChildView.resetHistory();
         this.sinon.spy(myCollectionView, 'detachHtml');
 
         detachView = myCollectionView.children.first();
@@ -540,9 +668,9 @@ describe('CollectionView Children', function() {
 
         describe('when attaching another childview at the end', function() {
           let anotherView;
-
+          let AnotherView;
           beforeEach(function() {
-            const AnotherView = View.extend({
+            AnotherView = View.extend({
               template: _.noop,
               onBeforeAttach: this.sinon.stub(),
               onAttach: this.sinon.stub()
@@ -574,7 +702,7 @@ describe('CollectionView Children', function() {
 
             // Only true if not maintaining collection sort
             myCollectionView.sortWithCollection = false;
-            myCollectionView.addChildView(anotherView);
+            myCollectionView.addChildView(new AnotherView());
             const callArgs = myCollectionView.attachHtml.args[0];
             const attachHtmlEls = callArgs[0];
             expect($(attachHtmlEls).children()).to.have.lengthOf(1);
@@ -754,7 +882,8 @@ describe('CollectionView Children', function() {
 
     describe('when view events are not monitored', function() {
       it('should detach the contents from the dom prior to destroying', function() {
-        this.sinon.spy(myCollectionView.Dom, 'detachContents');
+        myCollectionView.Dom = _.clone(myCollectionView.Dom);
+        myCollectionView.Dom.detachContents = this.sinon.stub();
         myCollectionView.monitorViewEvents = false;
         myCollectionView.destroy();
         expect(myCollectionView.Dom.detachContents).to.have.been.calledOnce

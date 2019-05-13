@@ -116,6 +116,51 @@ describe('view mixin', function() {
     });
   });
 
+  describe('when destroying a view with listeners for destroy', function() {
+    let view;
+    let destroyStub;
+    let beforeDestroyStub;
+    let onDestroyStub;
+    let onBeforeDestroyStub;
+
+    beforeEach(function() {
+
+      view = new View({
+        template: () => '<div data-foo-region></div>',
+        regions: {child: '[data-foo-region]'},
+        onRender() {
+          const childView = new View({ template: false });
+          this.listenTo(childView, 'destroy', this.destroy);
+          this.showChildView('child', childView);
+        }
+      });
+
+      destroyStub = sinon.stub();
+      view.on('destroy', destroyStub);
+
+      beforeDestroyStub = sinon.stub();
+      view.on('before:destroy', beforeDestroyStub);
+
+      onDestroyStub = sinon.stub();
+      view.onDestroy = onDestroyStub;
+
+      onBeforeDestroyStub = sinon.stub();
+      view.onBeforeDestroy = onBeforeDestroyStub;
+
+      view.render();
+      view.destroy();
+
+    });
+    it('should trigger the destroy event once', function() {
+      expect(destroyStub).to.have.been.calledOnce;
+      expect(onDestroyStub).to.have.been.calledOnce;
+    });
+    it('should trigger the before:destroy event once', function() {
+      expect(beforeDestroyStub).to.have.been.calledOnce;
+      expect(onBeforeDestroyStub).to.have.been.calledOnce;
+    });
+  });
+
   describe('constructing a view with default options', function() {
     let presets;
     let options;
@@ -378,21 +423,21 @@ describe('view mixin', function() {
         expect(layoutEventHandler)
           .to.have.been.calledWith('foo', 'bar')
           .and.to.have.been.calledOn(layoutView)
-          .and.CalledOnce;
+          .and.calledOnce;
       });
 
       it('invokes the layout on handler', function() {
         expect(layoutEventOnHandler)
           .to.have.been.calledWith('foo', 'bar')
           .and.to.have.been.calledOn(layoutView)
-          .and.CalledOnce;
+          .and.calledOnce;
       });
 
       it('invokes the layout childViewEvents handler', function() {
         expect(layoutViewOnBoomHandler)
           .to.have.been.calledWith('foo', 'bar')
           .and.to.have.been.calledOn(layoutView)
-          .and.CalledOnce;
+          .and.calledOnce;
       });
     });
 
@@ -409,7 +454,7 @@ describe('view mixin', function() {
         expect(layoutViewOnBoomHandler)
           .to.have.been.calledWith('foo', 'bar')
           .and.to.have.been.calledOn(layoutView)
-          .and.CalledOnce;
+          .and.calledOnce;
       });
     });
 
@@ -424,7 +469,7 @@ describe('view mixin', function() {
         expect(superViewOnRattleHandler)
           .to.have.been.calledWith('foo', 'bar')
           .to.have.been.calledOn(superView)
-          .and.CalledOnce;
+          .and.calledOnce;
       });
     });
 

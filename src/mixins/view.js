@@ -26,6 +26,10 @@ import DomApi from '../config/dom';
 const ViewMixin = {
   Dom: DomApi,
 
+  _isElAttached() {
+    return !!this.el && this.Dom.hasEl(this.Dom.getDocumentEl(this.el), this.el);
+  },
+
   supportsRenderLifecycle: true,
   supportsDestroyLifecycle: true,
 
@@ -111,7 +115,8 @@ const ViewMixin = {
 
   // Handle destroying the view and its children.
   destroy(options) {
-    if (this._isDestroyed) { return this; }
+    if (this._isDestroyed || this._isDestroying) { return this; }
+    this._isDestroying = true;
     const shouldTriggerDetach = this._isAttached && !this._disableDetachEvents;
 
     this.triggerMethod('before:destroy', this, options);
